@@ -2,15 +2,20 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { type DayPlan } from '../lib/menus'
+import {
+  type StoredMenu,
+  type ExerciseCompletion,
+  CHECKIN_KEY,
+  MENU_KEY,
+  LOG_KEY,
+  COMPLETION_KEY,
+  DAY_LABEL_TO_URL,
+  getDateKey,
+  getWeekDates,
+} from '../lib/training'
 
 type CheckInStatus = 'done' | 'rest'
 type CheckIns = Record<string, CheckInStatus>
-
-interface StoredMenu {
-  plan: DayPlan[]
-  level: string
-}
 
 interface ExerciseRecord {
   name: string
@@ -23,17 +28,7 @@ interface TrainingRecord {
   exercises: ExerciseRecord[]
 }
 
-const STORAGE_KEY = 'mworld_checkins'
-const MENU_KEY = 'mworld_generated_menu'
-const LOG_KEY = 'mworld_training_logs'
 const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
-
-function getDateKey(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
 
 function calculateStreak(checkIns: CheckIns, todayKey: string): number {
   let streak = 0
@@ -86,17 +81,27 @@ function getTodaySession(
 export default function TrainingDashboard() {
   const [checkIns, setCheckIns] = useState<CheckIns>({})
   const [trainingLogs, setTrainingLogs] = useState<TrainingRecord[]>([])
+  const [storedMenu, setStoredMenu] = useState<StoredMenu | null>(null)
+  const [exerciseCompletion, setExerciseCompletion] = useState<ExerciseCompletion>({})
   const [menuError, setMenuError] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(CHECKIN_KEY)
     if (raw) {
       try { setCheckIns(JSON.parse(raw)) } catch { /* ignore */ }
     }
     const logsRaw = localStorage.getItem(LOG_KEY)
     if (logsRaw) {
       try { setTrainingLogs(JSON.parse(logsRaw)) } catch { /* ignore */ }
+    }
+    const menuRaw = localStorage.getItem(MENU_KEY)
+    if (menuRaw) {
+      try { setStoredMenu(JSON.parse(menuRaw)) } catch { /* ignore */ }
+    }
+    const completionRaw = localStorage.getItem(COMPLETION_KEY)
+    if (completionRaw) {
+      try { setExerciseCompletion(JSON.parse(completionRaw)) } catch { /* ignore */ }
     }
     setMounted(true)
   }, [])
@@ -109,45 +114,54 @@ export default function TrainingDashboard() {
 
   const checkIn = (status: CheckInStatus) => {
     if (status === 'done') {
-      const menuRaw = localStorage.getItem(MENU_KEY)
-      if (!menuRaw) {
+      if (!storedMenu) {
         setMenuError(true)
         return
       }
-      try {
-        const menu: StoredMenu = JSON.parse(menuRaw)
-        const session = getTodaySession(menu, today.getDay())
-        const newLog: TrainingRecord = {
-          date: todayKey,
-          focus: session?.focus ?? '',
-          exercises: session?.exercises ?? [],
-        }
-        const updatedLogs = [
-          ...trainingLogs.filter((l) => l.date !== todayKey),
-          newLog,
-        ]
-        setTrainingLogs(updatedLogs)
-        localStorage.setItem(LOG_KEY, JSON.stringify(updatedLogs))
-      } catch {
-        setMenuError(true)
-        return
+      const session = getTodaySession(storedMenu, today.getDay())
+      const newLog: TrainingRecord = {
+        date: todayKey,
+        focus: session?.focus ?? '',
+        exercises: session?.exercises ?? [],
       }
+      const updatedLogs = [
+        ...trainingLogs.filter((l) => l.date !== todayKey),
+        newLog,
+      ]
+      setTrainingLogs(updatedLogs)
+      localStorage.setItem(LOG_KEY, JSON.stringify(updatedLogs))
     }
     setMenuError(false)
     const updated = { ...checkIns, [todayKey]: status }
     setCheckIns(updated)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    localStorage.setItem(CHECKIN_KEY, JSON.stringify(updated))
   }
 
   const undoToday = () => {
     const updated = { ...checkIns }
     delete updated[todayKey]
     setCheckIns(updated)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    localStorage.setItem(CHECKIN_KEY, JSON.stringify(updated))
   }
 
   if (!mounted) return null
 
+  // --- 今週のメニュー ---
+  const weekDates = getWeekDates(today) // Mon-Sun of current week
+  const weekDays = weekDates.map((date, i) => {
+    const dateKey = getDateKey(date)
+    const plan = storedMenu?.plan[i] ?? null
+    const dayLabel = plan?.day ?? ['月', '火', '水', '木', '金', '土', '日'][i]
+    const dayUrl = DAY_LABEL_TO_URL[dayLabel]
+    const completionArr = exerciseCompletion[dateKey] ?? []
+    const totalExercises = plan?.session?.exercises.length ?? 0
+    const completedCount = completionArr.filter(Boolean).length
+    const allDone = totalExercises > 0 && completedCount >= totalExercises
+    const isToday = dateKey === todayKey
+    return { date, dateKey, plan, dayLabel, dayUrl, totalExercises, completedCount, allDone, isToday }
+  })
+
+  // --- 履歴 ---
   const historyDays = [...getLast7Days(today)].reverse().map((date) => {
     const dateKey = getDateKey(date)
     return {
@@ -278,6 +292,87 @@ export default function TrainingDashboard() {
         <span className="text-base">🤖</span>
         AIメニュー自動生成
       </Link>
+
+      {/* Weekly Menu */}
+      <div className="w-full max-w-sm mt-12">
+        <p className="text-zinc-400 text-xs tracking-widest uppercase mb-4">今週のメニュー</p>
+        {!storedMenu ? (
+          <p className="text-zinc-700 text-sm text-center py-4">
+            メニューを生成するとここに表示されます
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {weekDays.map(({ date, dateKey, plan, dayLabel, dayUrl, totalExercises, completedCount, allDone, isToday }) => {
+              const isRest = plan?.isRest ?? false
+              const card = (
+                <div
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                    isToday
+                      ? 'border-orange-500/40 bg-zinc-900'
+                      : 'border-zinc-800 bg-zinc-900'
+                  } ${!isRest ? 'active:scale-[0.98] cursor-pointer hover:border-zinc-700' : ''}`}
+                >
+                  {/* Status indicator */}
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${
+                      allDone
+                        ? 'bg-green-500 text-white'
+                        : isRest
+                        ? 'bg-zinc-800 text-zinc-600'
+                        : 'bg-orange-500/15 text-orange-400'
+                    }`}
+                  >
+                    {allDone ? '✓' : isRest ? '−' : dayLabel}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-white text-sm font-bold">{dayLabel}曜日</p>
+                      {isToday && (
+                        <span className="text-orange-500 text-[10px] font-semibold bg-orange-500/10 px-1.5 py-0.5 rounded-full">
+                          今日
+                        </span>
+                      )}
+                    </div>
+                    {isRest ? (
+                      <p className="text-zinc-600 text-xs">休養日</p>
+                    ) : (
+                      <p className="text-zinc-500 text-xs truncate">
+                        {plan?.session?.focus ?? '−'}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Completion ratio */}
+                  {!isRest && totalExercises > 0 && (
+                    <span
+                      className={`text-xs font-semibold flex-shrink-0 ${
+                        allDone ? 'text-green-400' : 'text-orange-400'
+                      }`}
+                    >
+                      {completedCount}/{totalExercises}
+                    </span>
+                  )}
+
+                  {/* Arrow */}
+                  {!isRest && (
+                    <span className="text-zinc-700 text-base flex-shrink-0">›</span>
+                  )}
+                </div>
+              )
+
+              return isRest ? (
+                <div key={dateKey}>{card}</div>
+              ) : (
+                <Link key={dateKey} href={`/training/${dayUrl}`}>
+                  {card}
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Training History */}
       <div className="w-full max-w-sm mt-12">
