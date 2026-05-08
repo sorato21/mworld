@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "M.World",
   description: "筋トレ習慣化アプリ",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black",
+    title: "M.World",
+  },
 };
 
 export default function RootLayout({
