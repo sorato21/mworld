@@ -420,6 +420,15 @@ export default function TrainingDashboard() {
           ))}
         </div>
       </div>
+      {/* Feedback */}
+      <a
+        href="https://forms.gle/8289i9sDHX6j4qwB9"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-12 mb-2 text-orange-500 hover:text-orange-400 text-sm font-semibold transition-colors"
+      >
+        📝 フィードバックを送る
+      </a>
     </div>
   )
 }
