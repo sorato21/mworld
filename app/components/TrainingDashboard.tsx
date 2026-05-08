@@ -2,11 +2,30 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { type DayPlan } from '../lib/menus'
 
 type CheckInStatus = 'done' | 'rest'
 type CheckIns = Record<string, CheckInStatus>
 
+interface StoredMenu {
+  plan: DayPlan[]
+  level: string
+}
+
+interface ExerciseRecord {
+  name: string
+  setsReps: string
+}
+
+interface TrainingRecord {
+  date: string
+  focus: string
+  exercises: ExerciseRecord[]
+}
+
 const STORAGE_KEY = 'mworld_checkins'
+const MENU_KEY = 'mworld_generated_menu'
+const LOG_KEY = 'mworld_training_logs'
 const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
 
 function getDateKey(date: Date): string {
@@ -48,14 +67,36 @@ function streakMessage(streak: number): string {
   return '伝説級の継続力！'
 }
 
+function getTodaySession(
+  menu: StoredMenu,
+  dayOfWeek: number
+): { focus: string; exercises: ExerciseRecord[] } | null {
+  const dayLabel = DAY_LABELS[dayOfWeek]
+  const dayPlan = menu.plan.find((p) => p.day === dayLabel)
+  if (!dayPlan || dayPlan.isRest || !dayPlan.session) return null
+  return {
+    focus: dayPlan.session.focus,
+    exercises: dayPlan.session.exercises.map((ex) => ({
+      name: ex.name,
+      setsReps: ex.setsReps,
+    })),
+  }
+}
+
 export default function TrainingDashboard() {
   const [checkIns, setCheckIns] = useState<CheckIns>({})
+  const [trainingLogs, setTrainingLogs] = useState<TrainingRecord[]>([])
+  const [menuError, setMenuError] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       try { setCheckIns(JSON.parse(raw)) } catch { /* ignore */ }
+    }
+    const logsRaw = localStorage.getItem(LOG_KEY)
+    if (logsRaw) {
+      try { setTrainingLogs(JSON.parse(logsRaw)) } catch { /* ignore */ }
     }
     setMounted(true)
   }, [])
@@ -67,6 +108,32 @@ export default function TrainingDashboard() {
   const last7 = getLast7Days(today)
 
   const checkIn = (status: CheckInStatus) => {
+    if (status === 'done') {
+      const menuRaw = localStorage.getItem(MENU_KEY)
+      if (!menuRaw) {
+        setMenuError(true)
+        return
+      }
+      try {
+        const menu: StoredMenu = JSON.parse(menuRaw)
+        const session = getTodaySession(menu, today.getDay())
+        const newLog: TrainingRecord = {
+          date: todayKey,
+          focus: session?.focus ?? '',
+          exercises: session?.exercises ?? [],
+        }
+        const updatedLogs = [
+          ...trainingLogs.filter((l) => l.date !== todayKey),
+          newLog,
+        ]
+        setTrainingLogs(updatedLogs)
+        localStorage.setItem(LOG_KEY, JSON.stringify(updatedLogs))
+      } catch {
+        setMenuError(true)
+        return
+      }
+    }
+    setMenuError(false)
     const updated = { ...checkIns, [todayKey]: status }
     setCheckIns(updated)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
@@ -81,8 +148,18 @@ export default function TrainingDashboard() {
 
   if (!mounted) return null
 
+  const historyDays = [...getLast7Days(today)].reverse().map((date) => {
+    const dateKey = getDateKey(date)
+    return {
+      date,
+      dateKey,
+      log: trainingLogs.find((l) => l.date === dateKey) ?? null,
+      status: checkIns[dateKey] as CheckInStatus | undefined,
+    }
+  })
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center px-6 py-16 select-none">
+    <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center px-6 py-16 select-none">
       {/* Brand */}
       <div className="text-center mb-14">
         <h1 className="text-4xl font-black tracking-[0.25em] text-white uppercase">M.WORLD</h1>
@@ -108,7 +185,7 @@ export default function TrainingDashboard() {
         <p className="text-zinc-600 text-sm mt-1">{streakMessage(streak)}</p>
       </div>
 
-      {/* Last 7 days */}
+      {/* Last 7 days dots */}
       <div className="flex gap-2 mb-12">
         {last7.map((date) => {
           const key = getDateKey(date)
@@ -170,19 +247,26 @@ export default function TrainingDashboard() {
           やり直す
         </button>
       ) : (
-        <div className="flex gap-4">
-          <button
-            onClick={() => checkIn('done')}
-            className="px-8 py-4 bg-orange-500 hover:bg-orange-400 active:scale-95 text-white font-bold text-lg rounded-2xl transition-all shadow-lg shadow-orange-500/20"
-          >
-            やった！
-          </button>
-          <button
-            onClick={() => checkIn('rest')}
-            className="px-8 py-4 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-300 font-bold text-lg rounded-2xl transition-all"
-          >
-            休み
-          </button>
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex gap-4">
+            <button
+              onClick={() => checkIn('done')}
+              className="px-8 py-4 bg-orange-500 hover:bg-orange-400 active:scale-95 text-white font-bold text-lg rounded-2xl transition-all shadow-lg shadow-orange-500/20"
+            >
+              やった！
+            </button>
+            <button
+              onClick={() => checkIn('rest')}
+              className="px-8 py-4 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-300 font-bold text-lg rounded-2xl transition-all"
+            >
+              休み
+            </button>
+          </div>
+          {menuError && (
+            <p className="text-orange-400 text-sm font-semibold">
+              先にメニューを生成してください
+            </p>
+          )}
         </div>
       )}
 
@@ -194,6 +278,53 @@ export default function TrainingDashboard() {
         <span className="text-base">🤖</span>
         AIメニュー自動生成
       </Link>
+
+      {/* Training History */}
+      <div className="w-full max-w-sm mt-12">
+        <p className="text-zinc-400 text-xs tracking-widest uppercase mb-4">トレーニング履歴</p>
+        <div className="space-y-3">
+          {historyDays.map(({ date, dateKey, log, status }) => (
+            <div
+              key={dateKey}
+              className="bg-zinc-900 rounded-xl p-4 border border-zinc-800"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white font-bold text-sm">
+                  {date.toLocaleDateString('ja-JP', {
+                    month: 'numeric',
+                    day: 'numeric',
+                    weekday: 'short',
+                  })}
+                </span>
+                {status === 'done' && (
+                  <span className="text-orange-500 text-xs font-semibold">✓ 完了</span>
+                )}
+                {status === 'rest' && (
+                  <span className="text-zinc-500 text-xs">− 休養</span>
+                )}
+                {!status && (
+                  <span className="text-zinc-700 text-xs">未記録</span>
+                )}
+              </div>
+              {log && log.focus && (
+                <p className="text-orange-400 text-xs font-semibold mb-2">{log.focus}</p>
+              )}
+              {log && log.exercises.length > 0 ? (
+                <div className="space-y-1.5">
+                  {log.exercises.map((ex, i) => (
+                    <div key={i} className="flex items-start justify-between gap-3">
+                      <span className="text-zinc-300 text-xs">▸ {ex.name}</span>
+                      <span className="text-zinc-500 text-xs whitespace-nowrap">{ex.setsReps}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : status === 'done' ? (
+                <p className="text-zinc-700 text-xs">種目情報なし（休養日メニュー）</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

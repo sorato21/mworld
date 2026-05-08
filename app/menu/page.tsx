@@ -92,10 +92,10 @@ export default function MenuPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setResult({
-      plan: getWeekPlan(form.goal, form.location, form.level, form.frequency),
-      level: form.level,
-    })
+    const plan = getWeekPlan(form.goal, form.location, form.level, form.frequency)
+    const generated = { plan, level: form.level }
+    setResult(generated)
+    localStorage.setItem('mworld_generated_menu', JSON.stringify(generated))
   }
 
   return (
