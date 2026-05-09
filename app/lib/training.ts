@@ -62,10 +62,21 @@ export function getWeekDates(today: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => getWeekDayDate(today, i))
 }
 
+const BODYWEIGHT_KEYWORDS = [
+  'スクワット', 'プランク', 'グルートブリッジ', 'ジャンピングジャック',
+  'ハイニー', 'マウンテンクライマー', 'バーピー', 'ランジ', 'クランチ',
+  '腹筋', '腕立て伏せ', 'プッシュアップ', 'ヒップリフト', 'レッグレイズ',
+  'ジャンプスクワット', 'ニートゥチェスト',
+]
+
 export function getExerciseType(name: string): 'barbell' | 'dumbbell' | 'bodyweight' {
+  // 器具名が含まれる場合は自重より優先（例：バーベルスクワット）
   if (name.includes('バーベル')) return 'barbell'
   if (name.includes('ダンベル') || name.includes('ケトルベル')) return 'dumbbell'
-  return 'bodyweight'
+  // 自重ホワイトリストに部分一致する場合のみ自重系
+  if (BODYWEIGHT_KEYWORDS.some((kw) => name.includes(kw))) return 'bodyweight'
+  // それ以外（マシン・懸垂・デッドリフト等）はジム系
+  return 'barbell'
 }
 
 export function getDefaultWeight(name: string, bodyWeight: number | null): number {
