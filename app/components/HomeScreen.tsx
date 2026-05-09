@@ -9,6 +9,13 @@ import {
   WEIGHT_KEY,
   getDateKey,
 } from '../lib/training'
+import {
+  type XPStore,
+  loadXPStore,
+  getTotalXP,
+  getLevelInfo,
+  awardDayXP,
+} from '../lib/xp'
 import WeightModal from './WeightModal'
 
 type CheckInStatus = 'done' | 'rest'
@@ -83,6 +90,7 @@ export default function HomeScreen() {
   const [bodyWeight, setBodyWeight] = useState<number | null>(null)
   const [showWeightModal, setShowWeightModal] = useState(false)
   const [isFirstTime, setIsFirstTime] = useState(false)
+  const [xpStore, setXpStore] = useState<XPStore>({ dates: {} })
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -100,6 +108,7 @@ export default function HomeScreen() {
       setIsFirstTime(true)
       setShowWeightModal(true)
     }
+    setXpStore(loadXPStore())
     setMounted(true)
   }, [])
 
@@ -115,6 +124,10 @@ export default function HomeScreen() {
   const todayStatus = checkIns[todayKey]
   const streak = calculateStreak(checkIns, todayKey)
   const last7 = getLast7Days(today)
+
+  const totalXP = getTotalXP(xpStore)
+  const levelInfo = getLevelInfo(totalXP)
+  const todayXP = xpStore.dates[todayKey] ?? 0
 
   const checkIn = (status: CheckInStatus) => {
     if (status === 'done') {
@@ -139,6 +152,11 @@ export default function HomeScreen() {
     const updated = { ...checkIns, [todayKey]: status }
     setCheckIns(updated)
     localStorage.setItem(CHECKIN_KEY, JSON.stringify(updated))
+
+    if (status === 'done') {
+      awardDayXP(todayKey)
+      setXpStore(loadXPStore())
+    }
   }
 
   const undoToday = () => {
@@ -161,138 +179,163 @@ export default function HomeScreen() {
         />
       )}
 
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center px-6 py-12 select-none">
-      {/* Brand + 設定ボタン */}
-      <div className="w-full max-w-sm flex items-start justify-between mb-10">
-        <div>
-          <h1 className="text-4xl font-black tracking-[0.25em] text-white uppercase">M.WORLD</h1>
-          <p className="text-zinc-600 text-xs tracking-[0.2em] mt-1 uppercase">Fitness Habit Tracker</p>
+      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center px-6 py-12 select-none">
+        {/* Brand + 設定ボタン */}
+        <div className="w-full max-w-sm flex items-start justify-between mb-10">
+          <div>
+            <h1 className="text-4xl font-black tracking-[0.25em] text-white uppercase">M.WORLD</h1>
+            <p className="text-zinc-600 text-xs tracking-[0.2em] mt-1 uppercase">Fitness Habit Tracker</p>
+          </div>
+          <button
+            onClick={() => setShowWeightModal(true)}
+            className="flex flex-col items-center gap-1 mt-1 text-zinc-500 hover:text-orange-400 transition-colors"
+          >
+            <span className="text-lg leading-none">⚖️</span>
+            <span className="text-[10px] font-semibold whitespace-nowrap">
+              {bodyWeight != null ? `${bodyWeight}kg` : '体重'}
+            </span>
+          </button>
         </div>
-        <button
-          onClick={() => setShowWeightModal(true)}
-          className="flex flex-col items-center gap-1 mt-1 text-zinc-500 hover:text-orange-400 transition-colors"
-        >
-          <span className="text-lg leading-none">⚖️</span>
-          <span className="text-[10px] font-semibold whitespace-nowrap">
-            {bodyWeight != null ? `${bodyWeight}kg` : '体重'}
-          </span>
-        </button>
-      </div>
 
-      {/* Streak */}
-      <div className="text-center mb-10">
-        <div
-          className={`text-[7rem] font-black leading-none tabular-nums transition-colors duration-500 ${
-            streak >= 7
-              ? 'text-orange-400'
-              : streak > 0
-              ? 'text-amber-500'
-              : 'text-zinc-700'
-          }`}
-        >
-          {streak}
-        </div>
-        <p className="text-zinc-400 text-base mt-2 tracking-wide">
-          {streak > 0 ? '🔥 ' : ''}連続トレーニング日数
-        </p>
-        <p className="text-zinc-600 text-sm mt-1">{streakMessage(streak)}</p>
-      </div>
-
-      {/* Last 7 days */}
-      <div className="flex gap-2 mb-10">
-        {last7.map((date) => {
-          const key = getDateKey(date)
-          const status = checkIns[key]
-          const isToday = key === todayKey
-          return (
-            <div key={key} className="flex flex-col items-center gap-1.5">
-              <span className="text-[10px] text-zinc-600 uppercase">
-                {DAY_LABELS[date.getDay()]}
-              </span>
-              <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ring-2 transition-all ${
-                  isToday ? 'ring-white' : 'ring-transparent'
-                } ${
-                  status === 'done'
-                    ? 'bg-orange-500 text-white'
-                    : status === 'rest'
-                    ? 'bg-zinc-800 text-zinc-500'
-                    : 'bg-zinc-900 text-zinc-600'
-                }`}
-              >
-                {status === 'done' ? '✓' : status === 'rest' ? '−' : date.getDate()}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Today info */}
-      <div className="text-center mb-8">
-        <p className="text-zinc-500 text-sm">
-          {today.toLocaleDateString('ja-JP', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            weekday: 'short',
-          })}
-        </p>
-        {todayStatus && (
-          <p
-            className={`text-sm font-semibold mt-1 ${
-              todayStatus === 'done' ? 'text-orange-400' : 'text-zinc-500'
+        {/* Streak */}
+        <div className="text-center mb-6">
+          <div
+            className={`text-[7rem] font-black leading-none tabular-nums transition-colors duration-500 ${
+              streak >= 7
+                ? 'text-orange-400'
+                : streak > 0
+                ? 'text-amber-500'
+                : 'text-zinc-700'
             }`}
           >
-            {todayStatus === 'done' ? '今日のトレーニング完了！' : '今日は休養日'}
-          </p>
-        )}
-        {!todayStatus && (
-          <p className="text-zinc-600 text-sm mt-1">今日はまだチェックインしていません</p>
-        )}
-      </div>
-
-      {/* Actions */}
-      {todayStatus ? (
-        <button
-          onClick={undoToday}
-          className="text-zinc-700 text-xs hover:text-zinc-500 transition-colors"
-        >
-          やり直す
-        </button>
-      ) : (
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex gap-4">
-            <button
-              onClick={() => checkIn('done')}
-              className="px-8 py-4 bg-orange-500 hover:bg-orange-400 active:scale-95 text-white font-bold text-lg rounded-2xl transition-all shadow-lg shadow-orange-500/20"
-            >
-              やった！
-            </button>
-            <button
-              onClick={() => checkIn('rest')}
-              className="px-8 py-4 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-300 font-bold text-lg rounded-2xl transition-all"
-            >
-              休み
-            </button>
+            {streak}
           </div>
-          {menuError && (
-            <p className="text-orange-400 text-sm font-semibold">
-              先にメニューを生成してください
+          <p className="text-zinc-400 text-base mt-2 tracking-wide">
+            {streak > 0 ? '🔥 ' : ''}連続トレーニング日数
+          </p>
+          <p className="text-zinc-600 text-sm mt-1">{streakMessage(streak)}</p>
+        </div>
+
+        {/* XP Section */}
+        <div className="w-full max-w-sm mb-10">
+          <div className="flex items-end justify-between mb-2">
+            <div className="flex items-baseline gap-2">
+              <span className="text-orange-400 font-black text-3xl leading-none">
+                Lv{levelInfo.level}
+              </span>
+            </div>
+            <span className="text-zinc-500 text-xs tabular-nums">
+              {levelInfo.totalXP.toLocaleString()} / {levelInfo.nextThreshold.toLocaleString()} XP
+            </span>
+          </div>
+          <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-orange-600 to-orange-400 transition-all duration-700"
+              style={{ width: `${levelInfo.progressPct}%` }}
+            />
+          </div>
+          {todayXP > 0 && (
+            <p className="text-orange-400 text-xs font-semibold text-right mt-1.5">
+              今日 +{todayXP} XP 獲得！
             </p>
           )}
         </div>
-      )}
 
-      {/* Feedback */}
-      <a
-        href="https://forms.gle/8289i9sDHX6j4qwB9"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-12 text-orange-500 hover:text-orange-400 text-sm font-semibold transition-colors"
-      >
-        📝 フィードバックを送る
-      </a>
-    </div>
-  </>
+        {/* Last 7 days */}
+        <div className="flex gap-2 mb-10">
+          {last7.map((date) => {
+            const key = getDateKey(date)
+            const status = checkIns[key]
+            const isToday = key === todayKey
+            return (
+              <div key={key} className="flex flex-col items-center gap-1.5">
+                <span className="text-[10px] text-zinc-600 uppercase">
+                  {DAY_LABELS[date.getDay()]}
+                </span>
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ring-2 transition-all ${
+                    isToday ? 'ring-white' : 'ring-transparent'
+                  } ${
+                    status === 'done'
+                      ? 'bg-orange-500 text-white'
+                      : status === 'rest'
+                      ? 'bg-zinc-800 text-zinc-500'
+                      : 'bg-zinc-900 text-zinc-600'
+                  }`}
+                >
+                  {status === 'done' ? '✓' : status === 'rest' ? '−' : date.getDate()}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Today info */}
+        <div className="text-center mb-8">
+          <p className="text-zinc-500 text-sm">
+            {today.toLocaleDateString('ja-JP', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              weekday: 'short',
+            })}
+          </p>
+          {todayStatus && (
+            <p
+              className={`text-sm font-semibold mt-1 ${
+                todayStatus === 'done' ? 'text-orange-400' : 'text-zinc-500'
+              }`}
+            >
+              {todayStatus === 'done' ? '今日のトレーニング完了！' : '今日は休養日'}
+            </p>
+          )}
+          {!todayStatus && (
+            <p className="text-zinc-600 text-sm mt-1">今日はまだチェックインしていません</p>
+          )}
+        </div>
+
+        {/* Actions */}
+        {todayStatus ? (
+          <button
+            onClick={undoToday}
+            className="text-zinc-700 text-xs hover:text-zinc-500 transition-colors"
+          >
+            やり直す
+          </button>
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex gap-4">
+              <button
+                onClick={() => checkIn('done')}
+                className="px-8 py-4 bg-orange-500 hover:bg-orange-400 active:scale-95 text-white font-bold text-lg rounded-2xl transition-all shadow-lg shadow-orange-500/20"
+              >
+                やった！
+              </button>
+              <button
+                onClick={() => checkIn('rest')}
+                className="px-8 py-4 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-300 font-bold text-lg rounded-2xl transition-all"
+              >
+                休み
+              </button>
+            </div>
+            {menuError && (
+              <p className="text-orange-400 text-sm font-semibold">
+                先にメニューを生成してください
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Feedback */}
+        <a
+          href="https://forms.gle/8289i9sDHX6j4qwB9"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-12 text-orange-500 hover:text-orange-400 text-sm font-semibold transition-colors"
+        >
+          📝 フィードバックを送る
+        </a>
+      </div>
+    </>
   )
 }

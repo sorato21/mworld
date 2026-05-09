@@ -15,7 +15,11 @@ import {
   DAY_PLAN_INDEX,
   getDateKey,
   getWeekDayDate,
+  getExerciseType,
+  getDefaultWeight,
+  parseSetsReps,
 } from '../../lib/training'
+import { awardDayXP } from '../../lib/xp'
 
 interface EditableExercise {
   name: string
@@ -31,25 +35,6 @@ interface EditableDraft {
 function youtubeUrl(name: string, level: string): string {
   const suffix = level === '初心者' ? 'フォーム 初心者 解説' : 'フォーム 正しいやり方 効果的'
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' ' + suffix)}`
-}
-
-function getExerciseType(name: string): 'barbell' | 'dumbbell' | 'bodyweight' {
-  if (name.includes('バーベル')) return 'barbell'
-  if (name.includes('ダンベル') || name.includes('ケトルベル')) return 'dumbbell'
-  return 'bodyweight'
-}
-
-function getDefaultWeight(name: string, bodyWeight: number | null): number {
-  const type = getExerciseType(name)
-  if (type === 'barbell') return 20
-  if (type === 'dumbbell') return 10
-  return bodyWeight ?? 60
-}
-
-function parseSetsReps(setsReps: string): { sets: number; reps: number } | null {
-  const m = setsReps.match(/(\d+)\s*セット\s*[×x]\s*(\d+)/)
-  if (m) return { sets: Number(m[1]), reps: Number(m[2]) }
-  return null
 }
 
 export default function TrainingDayPage({
@@ -135,10 +120,20 @@ export default function TrainingDayPage({
     }
   }
 
-  const totalVolume = exercises.reduce((sum, ex) => {
+  // Gym (barbell/dumbbell) total volume — bodyweight excluded
+  const gymVolume = exercises.reduce((sum, ex) => {
+    if (getExerciseType(ex.name) === 'bodyweight') return sum
     const parsed = parseSetsReps(ex.setsReps)
     if (!parsed) return sum
     return sum + getEffectiveWeight(ex.name) * parsed.sets * parsed.reps
+  }, 0)
+
+  // Bodyweight total reps
+  const totalBwReps = exercises.reduce((sum, ex) => {
+    if (getExerciseType(ex.name) !== 'bodyweight') return sum
+    const parsed = parseSetsReps(ex.setsReps)
+    if (!parsed) return sum
+    return sum + parsed.sets * parsed.reps
   }, 0)
 
   // ---- チェックボックス ----
@@ -176,6 +171,7 @@ export default function TrainingDayPage({
       ]
       localStorage.setItem(LOG_KEY, JSON.stringify(updatedLogs))
       setAllDone(true)
+      awardDayXP(dateKey)
     } else {
       setAllDone(false)
     }
@@ -207,11 +203,7 @@ export default function TrainingDayPage({
       if (i !== planIndex || p.isRest || !p.session) return p
       return {
         ...p,
-        session: {
-          ...p.session,
-          focus: draft.focus,
-          exercises: draft.exercises,
-        },
+        session: { ...p.session, focus: draft.focus, exercises: draft.exercises },
       }
     })
     const updatedMenu: StoredMenu = { ...menu, plan: updatedPlan }
@@ -236,11 +228,7 @@ export default function TrainingDayPage({
     setDraft({ ...draft, focus: value })
   }
 
-  const updateDraftExercise = (
-    index: number,
-    field: 'name' | 'setsReps',
-    value: string
-  ) => {
+  const updateDraftExercise = (index: number, field: 'name' | 'setsReps', value: string) => {
     if (!draft) return
     const exs = [...draft.exercises]
     exs[index] = { ...exs[index], [field]: value }
@@ -249,18 +237,12 @@ export default function TrainingDayPage({
 
   const addExercise = () => {
     if (!draft) return
-    setDraft({
-      ...draft,
-      exercises: [...draft.exercises, { name: '', setsReps: '', advice: '' }],
-    })
+    setDraft({ ...draft, exercises: [...draft.exercises, { name: '', setsReps: '', advice: '' }] })
   }
 
   const removeExercise = (index: number) => {
     if (!draft) return
-    setDraft({
-      ...draft,
-      exercises: draft.exercises.filter((_, i) => i !== index),
-    })
+    setDraft({ ...draft, exercises: draft.exercises.filter((_, i) => i !== index) })
   }
 
   if (!mounted) return null
@@ -280,28 +262,20 @@ export default function TrainingDayPage({
       <div className="min-h-screen bg-zinc-900 text-white px-6 py-12">
         <div className="max-w-sm mx-auto">
           <div className="flex items-center justify-between mb-8">
-            <button
-              onClick={cancelEdit}
-              className="text-zinc-400 hover:text-zinc-200 text-sm transition-colors"
-            >
+            <button onClick={cancelEdit} className="text-zinc-400 hover:text-zinc-200 text-sm transition-colors">
               キャンセル
             </button>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
               <span className="text-zinc-400 text-xs tracking-widest uppercase">編集モード</span>
             </div>
-            <button
-              onClick={saveEdit}
-              className="px-4 py-2 bg-orange-500 hover:bg-orange-400 active:scale-95 text-white text-sm font-bold rounded-xl transition-all"
-            >
+            <button onClick={saveEdit} className="px-4 py-2 bg-orange-500 hover:bg-orange-400 active:scale-95 text-white text-sm font-bold rounded-xl transition-all">
               保存する
             </button>
           </div>
 
           <div className="mb-6">
-            <label className="text-zinc-500 text-xs tracking-widest uppercase block mb-2">
-              部位名
-            </label>
+            <label className="text-zinc-500 text-xs tracking-widest uppercase block mb-2">部位名</label>
             <input
               type="text"
               value={draft.focus}
@@ -320,9 +294,7 @@ export default function TrainingDayPage({
                     type="button"
                     onClick={() => removeExercise(i)}
                     className="w-6 h-6 rounded-full bg-zinc-700 hover:bg-red-600 active:scale-95 text-zinc-400 hover:text-white text-xs flex items-center justify-center transition-all"
-                  >
-                    ×
-                  </button>
+                  >×</button>
                 </div>
                 <div className="space-y-2">
                   <input
@@ -352,16 +324,10 @@ export default function TrainingDayPage({
             ＋ 種目を追加
           </button>
 
-          <button
-            onClick={saveEdit}
-            className="w-full mt-6 py-4 bg-orange-500 hover:bg-orange-400 active:scale-95 text-white font-bold text-base rounded-2xl transition-all shadow-lg shadow-orange-500/20"
-          >
+          <button onClick={saveEdit} className="w-full mt-6 py-4 bg-orange-500 hover:bg-orange-400 active:scale-95 text-white font-bold text-base rounded-2xl transition-all shadow-lg shadow-orange-500/20">
             保存する
           </button>
-          <button
-            onClick={cancelEdit}
-            className="w-full mt-3 py-3 text-zinc-600 hover:text-zinc-400 text-sm transition-colors"
-          >
+          <button onClick={cancelEdit} className="w-full mt-3 py-3 text-zinc-600 hover:text-zinc-400 text-sm transition-colors">
             キャンセル
           </button>
         </div>
@@ -392,10 +358,7 @@ export default function TrainingDayPage({
         {/* 日付 */}
         <p className="text-zinc-500 text-sm mb-6">
           {dayDate.toLocaleDateString('ja-JP', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            weekday: 'short',
+            year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
           })}
         </p>
 
@@ -403,10 +366,7 @@ export default function TrainingDayPage({
         {!menu && (
           <div className="text-center py-16">
             <p className="text-zinc-500 text-sm mb-6">メニューが生成されていません</p>
-            <Link
-              href="/menu"
-              className="px-6 py-3 bg-orange-500 hover:bg-orange-400 text-white text-sm font-bold rounded-2xl transition-all active:scale-95"
-            >
+            <Link href="/menu" className="px-6 py-3 bg-orange-500 hover:bg-orange-400 text-white text-sm font-bold rounded-2xl transition-all active:scale-95">
               メニューを生成する
             </Link>
           </div>
@@ -417,9 +377,7 @@ export default function TrainingDayPage({
           <div className="text-center py-16">
             <div className="text-5xl mb-4">😴</div>
             <p className="text-zinc-400 font-bold text-lg">今日は休養日</p>
-            <p className="text-zinc-600 text-sm mt-2">
-              しっかり休んで次のトレーニングに備えよう
-            </p>
+            <p className="text-zinc-600 text-sm mt-2">しっかり休んで次のトレーニングに備えよう</p>
           </div>
         )}
 
@@ -442,18 +400,18 @@ export default function TrainingDayPage({
             <div className="space-y-3">
               {exercises.map((ex, i) => {
                 const done = completion[i] ?? false
+                const isBw = getExerciseType(ex.name) === 'bodyweight'
                 const parsed = parseSetsReps(ex.setsReps)
-                const effectiveWeight = getEffectiveWeight(ex.name)
-                const exVolume = parsed ? effectiveWeight * parsed.sets * parsed.reps : null
-                const defaultW = getDefaultWeight(ex.name, bodyWeight)
+                const exVolume = !isBw && parsed
+                  ? getEffectiveWeight(ex.name) * parsed.sets * parsed.reps
+                  : null
+                const exBwReps = isBw && parsed ? parsed.sets * parsed.reps : null
 
                 return (
                   <div
                     key={i}
                     className={`rounded-2xl p-4 border transition-all ${
-                      done
-                        ? 'bg-zinc-900/40 border-zinc-800/40 opacity-60'
-                        : 'bg-zinc-900 border-zinc-800'
+                      done ? 'bg-zinc-900/40 border-zinc-800/40 opacity-60' : 'bg-zinc-900 border-zinc-800'
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -471,11 +429,7 @@ export default function TrainingDayPage({
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <span
-                            className={`font-bold text-sm ${
-                              done ? 'line-through text-zinc-500' : 'text-white'
-                            }`}
-                          >
+                          <span className={`font-bold text-sm ${done ? 'line-through text-zinc-500' : 'text-white'}`}>
                             {ex.name}
                           </span>
                           <span className="text-zinc-500 text-xs whitespace-nowrap flex-shrink-0">
@@ -485,26 +439,35 @@ export default function TrainingDayPage({
 
                         <p className="text-zinc-600 text-xs italic mb-2">{ex.advice}</p>
 
-                        {/* 重量入力 */}
-                        <div className="flex items-center gap-2 mb-3">
-                          <span className="text-zinc-500 text-xs">重量</span>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            value={weightInputs[ex.name] ?? ''}
-                            onChange={(e) => saveExerciseWeight(ex.name, e.target.value)}
-                            placeholder={String(defaultW)}
-                            className="w-16 bg-zinc-800 border border-zinc-700 focus:border-orange-500 text-white text-sm font-bold text-center rounded-xl px-2 py-1.5 outline-none transition-colors appearance-none"
-                          />
-                          <span className="text-zinc-400 text-xs">kg</span>
-                          {exVolume != null && (
-                            <span className="text-zinc-600 text-xs ml-auto">
-                              計 <span className="text-orange-400 font-semibold">
-                                {exVolume.toLocaleString()}
-                              </span> kg
-                            </span>
-                          )}
-                        </div>
+                        {/* 重量入力（ジム系） / 自重回数表示（自重系） */}
+                        {!isBw ? (
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="text-zinc-500 text-xs">重量</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={weightInputs[ex.name] ?? ''}
+                              onChange={(e) => saveExerciseWeight(ex.name, e.target.value)}
+                              placeholder={String(getDefaultWeight(ex.name, bodyWeight))}
+                              className="w-16 bg-zinc-800 border border-zinc-700 focus:border-orange-500 text-white text-sm font-bold text-center rounded-xl px-2 py-1.5 outline-none transition-colors appearance-none"
+                            />
+                            <span className="text-zinc-400 text-xs">kg</span>
+                            {exVolume != null && (
+                              <span className="text-zinc-600 text-xs ml-auto">
+                                計 <span className="text-orange-400 font-semibold">{exVolume.toLocaleString()}</span> kg
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          exBwReps != null && (
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-zinc-600 text-xs">自重</span>
+                              <span className="text-zinc-500 text-xs">
+                                計 <span className="text-zinc-300 font-semibold">{exBwReps}</span> 回
+                              </span>
+                            </div>
+                          )
+                        )}
 
                         <a
                           href={youtubeUrl(ex.name, menu.level)}
@@ -521,13 +484,28 @@ export default function TrainingDayPage({
               })}
             </div>
 
-            {/* 総重量 */}
-            {totalVolume > 0 && (
-              <div className="mt-4 px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-between">
-                <span className="text-zinc-500 text-xs">今日の総重量</span>
-                <span className="text-orange-400 font-black text-lg">
-                  {totalVolume.toLocaleString()} kg
-                </span>
+            {/* ボリューム集計 */}
+            {(gymVolume > 0 || totalBwReps > 0) && (
+              <div className="mt-4 px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-2">
+                {gymVolume > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-500 text-xs">ジム総重量</span>
+                    <span className="text-orange-400 font-black text-lg">
+                      {gymVolume.toLocaleString()} kg
+                    </span>
+                  </div>
+                )}
+                {gymVolume > 0 && totalBwReps > 0 && (
+                  <div className="border-t border-zinc-800" />
+                )}
+                {totalBwReps > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-500 text-xs">自重回数</span>
+                    <span className="text-zinc-300 font-black text-lg">
+                      {totalBwReps.toLocaleString()} 回
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -535,22 +513,14 @@ export default function TrainingDayPage({
             <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-zinc-600 text-xs">進捗</span>
-                <span
-                  className={`text-xs font-semibold ${
-                    allDone ? 'text-green-400' : 'text-orange-400'
-                  }`}
-                >
+                <span className={`text-xs font-semibold ${allDone ? 'text-green-400' : 'text-orange-400'}`}>
                   {completion.filter(Boolean).length} / {exercises.length}
                 </span>
               </div>
               <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    allDone ? 'bg-green-500' : 'bg-orange-500'
-                  }`}
-                  style={{
-                    width: `${(completion.filter(Boolean).length / exercises.length) * 100}%`,
-                  }}
+                  className={`h-full rounded-full transition-all duration-500 ${allDone ? 'bg-green-500' : 'bg-orange-500'}`}
+                  style={{ width: `${(completion.filter(Boolean).length / exercises.length) * 100}%` }}
                 />
               </div>
             </div>

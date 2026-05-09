@@ -13,6 +13,7 @@ export const LOG_KEY = 'mworld_training_logs'
 export const COMPLETION_KEY = 'mworld_exercise_completion'
 export const WEIGHT_KEY = 'mworld_body_weight'
 export const WEIGHT_LOG_KEY = 'mworld_exercise_weights'
+export const XP_KEY = 'mworld_xp'
 
 export const DAY_URL_TO_LABEL: Record<string, string> = {
   monday: '月',
@@ -59,4 +60,23 @@ export function getWeekDayDate(today: Date, dayIndex: number): Date {
 
 export function getWeekDates(today: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => getWeekDayDate(today, i))
+}
+
+export function getExerciseType(name: string): 'barbell' | 'dumbbell' | 'bodyweight' {
+  if (name.includes('バーベル')) return 'barbell'
+  if (name.includes('ダンベル') || name.includes('ケトルベル')) return 'dumbbell'
+  return 'bodyweight'
+}
+
+export function getDefaultWeight(name: string, bodyWeight: number | null): number {
+  const type = getExerciseType(name)
+  if (type === 'barbell') return 20
+  if (type === 'dumbbell') return 10
+  return bodyWeight ?? 60
+}
+
+export function parseSetsReps(setsReps: string): { sets: number; reps: number } | null {
+  const m = setsReps.match(/(\d+)\s*セット\s*[×x]\s*(\d+)/)
+  if (m) return { sets: Number(m[1]), reps: Number(m[2]) }
+  return null
 }
