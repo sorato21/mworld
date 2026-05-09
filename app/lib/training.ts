@@ -11,6 +11,8 @@ export const CHECKIN_KEY = 'mworld_checkins'
 export const MENU_KEY = 'mworld_generated_menu'
 export const LOG_KEY = 'mworld_training_logs'
 export const COMPLETION_KEY = 'mworld_exercise_completion'
+export const WEIGHT_KEY = 'mworld_body_weight'
+export const WEIGHT_LOG_KEY = 'mworld_exercise_weights'
 
 export const DAY_URL_TO_LABEL: Record<string, string> = {
   monday: '月',

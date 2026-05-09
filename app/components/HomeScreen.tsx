@@ -6,8 +6,10 @@ import {
   CHECKIN_KEY,
   MENU_KEY,
   LOG_KEY,
+  WEIGHT_KEY,
   getDateKey,
 } from '../lib/training'
+import WeightModal from './WeightModal'
 
 type CheckInStatus = 'done' | 'rest'
 type CheckIns = Record<string, CheckInStatus>
@@ -78,6 +80,9 @@ export default function HomeScreen() {
   const [trainingLogs, setTrainingLogs] = useState<TrainingRecord[]>([])
   const [storedMenu, setStoredMenu] = useState<StoredMenu | null>(null)
   const [menuError, setMenuError] = useState(false)
+  const [bodyWeight, setBodyWeight] = useState<number | null>(null)
+  const [showWeightModal, setShowWeightModal] = useState(false)
+  const [isFirstTime, setIsFirstTime] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -87,8 +92,23 @@ export default function HomeScreen() {
     if (logsRaw) { try { setTrainingLogs(JSON.parse(logsRaw)) } catch { /* ignore */ } }
     const menuRaw = localStorage.getItem(MENU_KEY)
     if (menuRaw) { try { setStoredMenu(JSON.parse(menuRaw)) } catch { /* ignore */ } }
+    const weightRaw = localStorage.getItem(WEIGHT_KEY)
+    if (weightRaw) {
+      const w = parseFloat(weightRaw)
+      if (!isNaN(w)) setBodyWeight(w)
+    } else {
+      setIsFirstTime(true)
+      setShowWeightModal(true)
+    }
     setMounted(true)
   }, [])
+
+  const saveWeight = (weight: number) => {
+    setBodyWeight(weight)
+    localStorage.setItem(WEIGHT_KEY, String(weight))
+    setShowWeightModal(false)
+    setIsFirstTime(false)
+  }
 
   const today = new Date()
   const todayKey = getDateKey(today)
@@ -131,11 +151,32 @@ export default function HomeScreen() {
   if (!mounted) return null
 
   return (
+    <>
+      {showWeightModal && (
+        <WeightModal
+          initialWeight={bodyWeight ?? undefined}
+          isFirstTime={isFirstTime}
+          onSave={saveWeight}
+          onClose={isFirstTime ? undefined : () => setShowWeightModal(false)}
+        />
+      )}
+
     <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center px-6 py-12 select-none">
-      {/* Brand */}
-      <div className="text-center mb-10">
-        <h1 className="text-4xl font-black tracking-[0.25em] text-white uppercase">M.WORLD</h1>
-        <p className="text-zinc-600 text-xs tracking-[0.2em] mt-1 uppercase">Fitness Habit Tracker</p>
+      {/* Brand + 設定ボタン */}
+      <div className="w-full max-w-sm flex items-start justify-between mb-10">
+        <div>
+          <h1 className="text-4xl font-black tracking-[0.25em] text-white uppercase">M.WORLD</h1>
+          <p className="text-zinc-600 text-xs tracking-[0.2em] mt-1 uppercase">Fitness Habit Tracker</p>
+        </div>
+        <button
+          onClick={() => setShowWeightModal(true)}
+          className="flex flex-col items-center gap-1 mt-1 text-zinc-500 hover:text-orange-400 transition-colors"
+        >
+          <span className="text-lg leading-none">⚖️</span>
+          <span className="text-[10px] font-semibold whitespace-nowrap">
+            {bodyWeight != null ? `${bodyWeight}kg` : '体重'}
+          </span>
+        </button>
       </div>
 
       {/* Streak */}
@@ -252,5 +293,6 @@ export default function HomeScreen() {
         📝 フィードバックを送る
       </a>
     </div>
+  </>
   )
 }

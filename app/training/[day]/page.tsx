@@ -9,6 +9,8 @@ import {
   CHECKIN_KEY,
   LOG_KEY,
   COMPLETION_KEY,
+  WEIGHT_KEY,
+  WEIGHT_LOG_KEY,
   DAY_URL_TO_LABEL,
   DAY_PLAN_INDEX,
   getDateKey,
@@ -31,6 +33,25 @@ function youtubeUrl(name: string, level: string): string {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' ' + suffix)}`
 }
 
+function getExerciseType(name: string): 'barbell' | 'dumbbell' | 'bodyweight' {
+  if (name.includes('バーベル')) return 'barbell'
+  if (name.includes('ダンベル') || name.includes('ケトルベル')) return 'dumbbell'
+  return 'bodyweight'
+}
+
+function getDefaultWeight(name: string, bodyWeight: number | null): number {
+  const type = getExerciseType(name)
+  if (type === 'barbell') return 20
+  if (type === 'dumbbell') return 10
+  return bodyWeight ?? 60
+}
+
+function parseSetsReps(setsReps: string): { sets: number; reps: number } | null {
+  const m = setsReps.match(/(\d+)\s*セット\s*[×x]\s*(\d+)/)
+  if (m) return { sets: Number(m[1]), reps: Number(m[2]) }
+  return null
+}
+
 export default function TrainingDayPage({
   params,
 }: {
@@ -45,6 +66,8 @@ export default function TrainingDayPage({
   const [mounted, setMounted] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [draft, setDraft] = useState<EditableDraft | null>(null)
+  const [weightInputs, setWeightInputs] = useState<Record<string, string>>({})
+  const [bodyWeight, setBodyWeight] = useState<number | null>(null)
 
   const today = new Date()
   const dayIndex = dayLabel != null ? DAY_PLAN_INDEX[dayLabel] : 0
@@ -63,6 +86,20 @@ export default function TrainingDayPage({
         setCompletion(all[dateKey] ?? [])
       } catch { /* ignore */ }
     }
+    const bwRaw = localStorage.getItem(WEIGHT_KEY)
+    if (bwRaw) {
+      const w = parseFloat(bwRaw)
+      if (!isNaN(w)) setBodyWeight(w)
+    }
+    const wlRaw = localStorage.getItem(WEIGHT_LOG_KEY)
+    if (wlRaw) {
+      try {
+        const saved: Record<string, number> = JSON.parse(wlRaw)
+        const inputs: Record<string, string> = {}
+        for (const [k, v] of Object.entries(saved)) inputs[k] = String(v)
+        setWeightInputs(inputs)
+      } catch { /* ignore */ }
+    }
     setMounted(true)
   }, [dateKey])
 
@@ -77,6 +114,32 @@ export default function TrainingDayPage({
       )
     }
   }, [completion, exercises.length])
+
+  const getEffectiveWeight = (name: string): number => {
+    const val = weightInputs[name]
+    if (val) {
+      const num = parseFloat(val)
+      if (!isNaN(num) && num > 0) return num
+    }
+    return getDefaultWeight(name, bodyWeight)
+  }
+
+  const saveExerciseWeight = (name: string, value: string) => {
+    setWeightInputs((prev) => ({ ...prev, [name]: value }))
+    const num = parseFloat(value)
+    if (!isNaN(num) && num > 0) {
+      const raw = localStorage.getItem(WEIGHT_LOG_KEY)
+      const all: Record<string, number> = raw ? JSON.parse(raw) : {}
+      all[name] = num
+      localStorage.setItem(WEIGHT_LOG_KEY, JSON.stringify(all))
+    }
+  }
+
+  const totalVolume = exercises.reduce((sum, ex) => {
+    const parsed = parseSetsReps(ex.setsReps)
+    if (!parsed) return sum
+    return sum + getEffectiveWeight(ex.name) * parsed.sets * parsed.reps
+  }, 0)
 
   // ---- チェックボックス ----
   const toggleExercise = (index: number) => {
@@ -155,7 +218,6 @@ export default function TrainingDayPage({
     setMenu(updatedMenu)
     localStorage.setItem(MENU_KEY, JSON.stringify(updatedMenu))
 
-    // 種目数が変わったら完了状態をリセット
     if (draft.exercises.length !== exercises.length) {
       const completionRaw = localStorage.getItem(COMPLETION_KEY)
       const all: ExerciseCompletion = completionRaw ? JSON.parse(completionRaw) : {}
@@ -217,7 +279,6 @@ export default function TrainingDayPage({
     return (
       <div className="min-h-screen bg-zinc-900 text-white px-6 py-12">
         <div className="max-w-sm mx-auto">
-          {/* 編集ヘッダー */}
           <div className="flex items-center justify-between mb-8">
             <button
               onClick={cancelEdit}
@@ -237,7 +298,6 @@ export default function TrainingDayPage({
             </button>
           </div>
 
-          {/* 部位名編集 */}
           <div className="mb-6">
             <label className="text-zinc-500 text-xs tracking-widest uppercase block mb-2">
               部位名
@@ -251,13 +311,9 @@ export default function TrainingDayPage({
             />
           </div>
 
-          {/* 種目リスト */}
           <div className="space-y-3 mb-4">
             {draft.exercises.map((ex, i) => (
-              <div
-                key={i}
-                className="bg-zinc-800 border border-zinc-700 rounded-2xl p-4"
-              >
+              <div key={i} className="bg-zinc-800 border border-zinc-700 rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-zinc-500 text-xs">種目 {i + 1}</span>
                   <button
@@ -288,7 +344,6 @@ export default function TrainingDayPage({
             ))}
           </div>
 
-          {/* 種目追加ボタン */}
           <button
             type="button"
             onClick={addExercise}
@@ -297,7 +352,6 @@ export default function TrainingDayPage({
             ＋ 種目を追加
           </button>
 
-          {/* 下部保存ボタン */}
           <button
             onClick={saveEdit}
             className="w-full mt-6 py-4 bg-orange-500 hover:bg-orange-400 active:scale-95 text-white font-bold text-base rounded-2xl transition-all shadow-lg shadow-orange-500/20"
@@ -388,6 +442,11 @@ export default function TrainingDayPage({
             <div className="space-y-3">
               {exercises.map((ex, i) => {
                 const done = completion[i] ?? false
+                const parsed = parseSetsReps(ex.setsReps)
+                const effectiveWeight = getEffectiveWeight(ex.name)
+                const exVolume = parsed ? effectiveWeight * parsed.sets * parsed.reps : null
+                const defaultW = getDefaultWeight(ex.name, bodyWeight)
+
                 return (
                   <div
                     key={i}
@@ -423,7 +482,30 @@ export default function TrainingDayPage({
                             {ex.setsReps}
                           </span>
                         </div>
-                        <p className="text-zinc-600 text-xs italic mb-3">{ex.advice}</p>
+
+                        <p className="text-zinc-600 text-xs italic mb-2">{ex.advice}</p>
+
+                        {/* 重量入力 */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-zinc-500 text-xs">重量</span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={weightInputs[ex.name] ?? ''}
+                            onChange={(e) => saveExerciseWeight(ex.name, e.target.value)}
+                            placeholder={String(defaultW)}
+                            className="w-16 bg-zinc-800 border border-zinc-700 focus:border-orange-500 text-white text-sm font-bold text-center rounded-xl px-2 py-1.5 outline-none transition-colors appearance-none"
+                          />
+                          <span className="text-zinc-400 text-xs">kg</span>
+                          {exVolume != null && (
+                            <span className="text-zinc-600 text-xs ml-auto">
+                              計 <span className="text-orange-400 font-semibold">
+                                {exVolume.toLocaleString()}
+                              </span> kg
+                            </span>
+                          )}
+                        </div>
+
                         <a
                           href={youtubeUrl(ex.name, menu.level)}
                           target="_blank"
@@ -439,8 +521,18 @@ export default function TrainingDayPage({
               })}
             </div>
 
+            {/* 総重量 */}
+            {totalVolume > 0 && (
+              <div className="mt-4 px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-between">
+                <span className="text-zinc-500 text-xs">今日の総重量</span>
+                <span className="text-orange-400 font-black text-lg">
+                  {totalVolume.toLocaleString()} kg
+                </span>
+              </div>
+            )}
+
             {/* 進捗バー */}
-            <div className="mt-8">
+            <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-zinc-600 text-xs">進捗</span>
                 <span
