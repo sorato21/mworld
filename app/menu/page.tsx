@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { getWeekPlan, type Goal, type TrainingLocation, type Level, type DayPlan } from '../lib/menus'
 
 interface FormState {
@@ -102,17 +101,9 @@ export default function MenuPage() {
     <div className="min-h-screen bg-zinc-950 text-white px-6 py-12">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-10">
-          <Link
-            href="/"
-            className="text-zinc-600 hover:text-zinc-400 transition-colors text-sm"
-          >
-            ← ホーム
-          </Link>
-          <div>
-            <h1 className="text-2xl font-black tracking-widest uppercase">M.WORLD</h1>
-            <p className="text-zinc-600 text-xs tracking-wider">週間トレーニングメニュー</p>
-          </div>
+        <div className="mb-10">
+          <h1 className="text-2xl font-black tracking-widest uppercase">M.WORLD</h1>
+          <p className="text-zinc-600 text-xs tracking-wider">週間トレーニングメニュー</p>
         </div>
 
         {/* Form */}

@@ -321,17 +321,9 @@ export default function TrainingDayPage({
       <div className="max-w-sm mx-auto">
         {/* ヘッダー */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/"
-              className="text-zinc-600 hover:text-zinc-400 transition-colors text-sm"
-            >
-              ← ホーム
-            </Link>
-            <div>
-              <h1 className="text-xl font-black tracking-widest uppercase">M.WORLD</h1>
-              <p className="text-zinc-600 text-xs">{dayLabel}曜日のトレーニング</p>
-            </div>
+          <div>
+            <h1 className="text-xl font-black tracking-widest uppercase">M.WORLD</h1>
+            <p className="text-zinc-600 text-xs">{dayLabel}曜日のトレーニング</p>
           </div>
           {menu && !dayPlan?.isRest && (
             <button

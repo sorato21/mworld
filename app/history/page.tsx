@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { CHECKIN_KEY, LOG_KEY, getDateKey } from '../lib/training'
 
 type CheckInStatus = 'done' | 'rest'
@@ -56,14 +55,9 @@ export default function HistoryPage() {
     <div className="min-h-screen bg-zinc-950 text-white px-6 py-12 select-none">
       <div className="max-w-sm mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-10">
-          <Link href="/" className="text-zinc-600 hover:text-zinc-400 transition-colors text-sm">
-            ← ホーム
-          </Link>
-          <div>
-            <h1 className="text-xl font-black tracking-widest uppercase">M.WORLD</h1>
-            <p className="text-zinc-600 text-xs">トレーニング履歴</p>
-          </div>
+        <div className="mb-10">
+          <h1 className="text-xl font-black tracking-widest uppercase">M.WORLD</h1>
+          <p className="text-zinc-600 text-xs">トレーニング履歴</p>
         </div>
 
         <p className="text-zinc-400 text-xs tracking-widest uppercase mb-4">過去7日間</p>
