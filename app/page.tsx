@@ -1,5 +1,5 @@
-import TrainingDashboard from './components/TrainingDashboard'
+import HomeScreen from './components/HomeScreen'
 
 export default function Home() {
-  return <TrainingDashboard />
+  return <HomeScreen />
 }
