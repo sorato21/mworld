@@ -12,6 +12,7 @@ import {
 import {
   type XPStore,
   loadXPStore,
+  saveXPStore,
   getTotalXP,
   getLevelInfo,
   awardDayXP,
@@ -166,6 +167,50 @@ export default function HomeScreen() {
     localStorage.setItem(CHECKIN_KEY, JSON.stringify(updated))
   }
 
+  // 過去の日付のチェックイン切り替え：なし → done → rest → なし
+  const togglePastCheckin = (dateKey: string, date: Date) => {
+    const current = checkIns[dateKey]
+    let next: CheckInStatus | undefined
+    if (!current) next = 'done'
+    else if (current === 'done') next = 'rest'
+    else next = undefined
+
+    const updated = { ...checkIns }
+    if (next) {
+      updated[dateKey] = next
+    } else {
+      delete updated[dateKey]
+    }
+    setCheckIns(updated)
+    localStorage.setItem(CHECKIN_KEY, JSON.stringify(updated))
+
+    if (next === 'done') {
+      if (storedMenu) {
+        const dayLabel = DAY_LABELS[date.getDay()]
+        const dayPlan = storedMenu.plan.find((p) => p.day === dayLabel)
+        if (dayPlan && !dayPlan.isRest && dayPlan.session) {
+          const newLog = {
+            date: dateKey,
+            focus: dayPlan.session.focus,
+            exercises: dayPlan.session.exercises.map((ex) => ({ name: ex.name, setsReps: ex.setsReps })),
+          }
+          const logsRaw = localStorage.getItem(LOG_KEY)
+          const logs = logsRaw ? JSON.parse(logsRaw) : []
+          const updatedLogs = [...logs.filter((l: { date: string }) => l.date !== dateKey), newLog]
+          setTrainingLogs(updatedLogs)
+          localStorage.setItem(LOG_KEY, JSON.stringify(updatedLogs))
+        }
+      }
+      awardDayXP(dateKey)
+      setXpStore(loadXPStore())
+    } else if (current === 'done') {
+      const store = loadXPStore()
+      delete store.dates[dateKey]
+      saveXPStore(store)
+      setXpStore(loadXPStore())
+    }
+  }
+
   if (!mounted) return null
 
   return (
@@ -242,7 +287,7 @@ export default function HomeScreen() {
         </div>
 
         {/* Last 7 days */}
-        <div className="flex gap-2 mb-10">
+        <div className="flex gap-2 mb-2">
           {last7.map((date) => {
             const key = getDateKey(date)
             const status = checkIns[key]
@@ -253,8 +298,11 @@ export default function HomeScreen() {
                   {DAY_LABELS[date.getDay()]}
                 </span>
                 <div
+                  onClick={isToday ? undefined : () => togglePastCheckin(key, date)}
                   className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ring-2 transition-all ${
-                    isToday ? 'ring-white' : 'ring-transparent'
+                    isToday
+                      ? 'ring-white'
+                      : 'ring-transparent cursor-pointer active:scale-95 hover:ring-zinc-600'
                   } ${
                     status === 'done'
                       ? 'bg-orange-500 text-white'
@@ -269,6 +317,7 @@ export default function HomeScreen() {
             )
           })}
         </div>
+        <p className="text-zinc-700 text-[10px] text-center mb-8">過去の日付をタップして記録を変更</p>
 
         {/* Today info */}
         <div className="text-center mb-8">
