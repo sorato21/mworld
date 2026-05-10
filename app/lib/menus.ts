@@ -549,6 +549,17 @@ const MENUS: Record<string, Session[]> = {
   ],
 }
 
+const EXERCISE_ADVICE: Record<string, string> = Object.fromEntries(
+  Object.values(MENUS)
+    .flat()
+    .flatMap((s) => s.exercises)
+    .map((ex) => [ex.name, ex.advice])
+)
+
+export function getAdviceForExercise(name: string): string {
+  return EXERCISE_ADVICE[name] ?? ''
+}
+
 export function getWeekPlan(
   goal: Goal,
   location: TrainingLocation,

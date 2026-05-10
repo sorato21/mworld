@@ -19,6 +19,7 @@ import {
   getDefaultWeight,
   parseSetsReps,
 } from '../../lib/training'
+import { getAdviceForExercise } from '../../lib/menus'
 import { awardDayXP } from '../../lib/xp'
 
 interface EditableExercise {
@@ -231,7 +232,12 @@ export default function TrainingDayPage({
   const updateDraftExercise = (index: number, field: 'name' | 'setsReps', value: string) => {
     if (!draft) return
     const exs = [...draft.exercises]
-    exs[index] = { ...exs[index], [field]: value }
+    const updated = { ...exs[index], [field]: value }
+    if (field === 'name') {
+      const advice = getAdviceForExercise(value)
+      if (advice) updated.advice = advice
+    }
+    exs[index] = updated
     setDraft({ ...draft, exercises: exs })
   }
 

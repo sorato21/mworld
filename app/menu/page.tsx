@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getWeekPlan, type Goal, type TrainingLocation, type Level, type DayPlan } from '../lib/menus'
+import { getWeekPlan, getAdviceForExercise, type Goal, type TrainingLocation, type Level, type DayPlan } from '../lib/menus'
 import { MENU_KEY } from '../lib/training'
 
 interface FormState {
@@ -145,9 +145,15 @@ export default function MenuPage() {
     setEditablePlan((prev) =>
       prev.map((d, idx) => {
         if (idx !== dayIdx || !d.session) return d
-        const exs = d.session.exercises.map((ex, ei) =>
-          ei !== exIdx ? ex : { ...ex, [field]: value }
-        )
+        const exs = d.session.exercises.map((ex, ei) => {
+          if (ei !== exIdx) return ex
+          const updated = { ...ex, [field]: value }
+          if (field === 'name') {
+            const advice = getAdviceForExercise(value)
+            if (advice) updated.advice = advice
+          }
+          return updated
+        })
         return { ...d, session: { ...d.session, exercises: exs } }
       })
     )
