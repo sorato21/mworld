@@ -311,7 +311,7 @@ export default function HomeScreen() {
                       : 'bg-zinc-900 text-zinc-600'
                   }`}
                 >
-                  {status === 'done' ? '✓' : status === 'rest' ? '−' : date.getDate()}
+                  {status === 'done' ? '✓' : date.getDate()}
                 </div>
               </div>
             )
