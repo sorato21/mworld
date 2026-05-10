@@ -22,10 +22,13 @@ export interface DayPlan {
 const DAYS = ['月', '火', '水', '木', '金', '土', '日']
 
 const TRAINING_DAYS: Record<number, number[]> = {
+  1: [0],
   2: [0, 3],
   3: [0, 2, 4],
   4: [0, 1, 3, 5],
   5: [0, 1, 2, 3, 4],
+  6: [0, 1, 2, 3, 4, 5],
+  7: [0, 1, 2, 3, 4, 5, 6],
 }
 
 const MENUS: Record<string, Session[]> = {
@@ -558,6 +561,6 @@ export function getWeekPlan(
   return DAYS.map((day, idx) => {
     const sessionIdx = trainingDayIndices.indexOf(idx)
     if (sessionIdx === -1) return { day, isRest: true, session: null }
-    return { day, isRest: false, session: sessions[sessionIdx] ?? null }
+    return { day, isRest: false, session: sessions[sessionIdx % sessions.length] ?? null }
   })
 }

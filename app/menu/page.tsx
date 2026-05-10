@@ -128,21 +128,19 @@ export default function MenuPage() {
             <p className="text-zinc-400 text-xs tracking-widest uppercase mb-3">
               週のトレーニング頻度
             </p>
-            <div className="flex flex-wrap gap-2">
-              {[2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, frequency: n }))}
-                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 ${
-                    form.frequency === n
-                      ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
-                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                  }`}
-                >
-                  週{n}回
-                </button>
-              ))}
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min={1}
+                max={7}
+                value={form.frequency}
+                onChange={(e) => {
+                  const v = Math.min(7, Math.max(1, parseInt(e.target.value) || 1))
+                  setForm((f) => ({ ...f, frequency: v }))
+                }}
+                className="w-20 px-4 py-2 rounded-xl text-sm font-semibold bg-zinc-800 text-white border border-zinc-700 focus:border-orange-500 focus:outline-none text-center"
+              />
+              <span className="text-zinc-400 text-sm">回 / 週（1〜7）</span>
             </div>
           </div>
 
