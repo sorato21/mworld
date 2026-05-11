@@ -19,6 +19,7 @@ import {
 } from '../lib/xp'
 import WeightModal from './WeightModal'
 import NotificationModal from './NotificationModal'
+import GuideModal from './GuideModal'
 
 const NOTIF_KEY = 'mworld_notification_settings'
 
@@ -104,6 +105,7 @@ export default function HomeScreen() {
   const [mounted, setMounted] = useState(false)
   const [showNotifModal, setShowNotifModal] = useState(false)
   const [notifSettings, setNotifSettings] = useState<NotifSettings>({ enabled: false, hour: 20, minute: 0 })
+  const [showGuide, setShowGuide] = useState(false)
 
   useEffect(() => {
     const raw = localStorage.getItem(CHECKIN_KEY)
@@ -280,6 +282,8 @@ export default function HomeScreen() {
         />
       )}
 
+      {showGuide && <GuideModal onClose={() => setShowGuide(false)} />}
+
       {showNotifModal && (
         <NotificationModal
           initialEnabled={notifSettings.enabled}
@@ -298,6 +302,13 @@ export default function HomeScreen() {
             <p className="text-zinc-600 text-xs tracking-[0.2em] mt-1 uppercase">Fitness Habit Tracker</p>
           </div>
           <div className="flex items-start gap-3 mt-1">
+            <button
+              onClick={() => setShowGuide(true)}
+              className="flex flex-col items-center gap-1 text-zinc-500 hover:text-orange-400 transition-colors"
+            >
+              <span className="text-lg leading-none">ℹ️</span>
+              <span className="text-[10px] font-semibold whitespace-nowrap">使い方</span>
+            </button>
             <button
               onClick={() => setShowNotifModal(true)}
               className="flex flex-col items-center gap-1 text-zinc-500 hover:text-orange-400 transition-colors"
