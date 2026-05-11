@@ -20,6 +20,8 @@ import {
 import WeightModal from './WeightModal'
 import NotificationModal from './NotificationModal'
 import GuideModal from './GuideModal'
+import DailyRecordModal from './DailyRecordModal'
+import { loadRecords, SKIP_RECORD_KEY } from '../lib/records'
 
 const NOTIF_KEY = 'mworld_notification_settings'
 
@@ -106,6 +108,7 @@ export default function HomeScreen() {
   const [showNotifModal, setShowNotifModal] = useState(false)
   const [notifSettings, setNotifSettings] = useState<NotifSettings>({ enabled: false, hour: 20, minute: 0 })
   const [showGuide, setShowGuide] = useState(false)
+  const [showDailyRecord, setShowDailyRecord] = useState(false)
 
   useEffect(() => {
     const raw = localStorage.getItem(CHECKIN_KEY)
@@ -153,6 +156,15 @@ export default function HomeScreen() {
           event.ports[0]?.postMessage({ checkedIn: checkins[todayKey] === 'done' })
         }
       })
+    }
+
+    // 体重記録モーダルの自動表示チェック
+    const todayDateKey = getDateKey(new Date())
+    const skipDate = localStorage.getItem(SKIP_RECORD_KEY)
+    const todayRecords = loadRecords()
+    const hasTodayRecord = todayRecords.some((r) => r.date === todayDateKey)
+    if (!hasTodayRecord && skipDate !== todayDateKey) {
+      setShowDailyRecord(true)
     }
 
     setMounted(true)
@@ -283,6 +295,13 @@ export default function HomeScreen() {
       )}
 
       {showGuide && <GuideModal onClose={() => setShowGuide(false)} />}
+
+      {showDailyRecord && (
+        <DailyRecordModal
+          onSaved={() => setShowDailyRecord(false)}
+          onSkip={() => setShowDailyRecord(false)}
+        />
+      )}
 
       {showNotifModal && (
         <NotificationModal

@@ -7,7 +7,8 @@ const TABS = [
   { href: '/', icon: '🏠', label: 'ホーム' },
   { href: '/calendar', icon: '📅', label: 'カレンダー' },
   { href: '/menu', icon: '🤖', label: 'メニュー' },
-  { href: '/history', icon: '📊', label: '履歴' },
+  { href: '/record', icon: '📊', label: '記録' },
+  { href: '/history', icon: '📝', label: '履歴' },
 ]
 
 function getActiveTab(pathname: string): string {
