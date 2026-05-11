@@ -18,6 +18,15 @@ import {
   awardDayXP,
 } from '../lib/xp'
 import WeightModal from './WeightModal'
+import NotificationModal from './NotificationModal'
+
+const NOTIF_KEY = 'mworld_notification_settings'
+
+interface NotifSettings {
+  enabled: boolean
+  hour: number
+  minute: number
+}
 
 type CheckInStatus = 'done' | 'rest'
 type CheckIns = Record<string, CheckInStatus>
@@ -93,6 +102,8 @@ export default function HomeScreen() {
   const [isFirstTime, setIsFirstTime] = useState(false)
   const [xpStore, setXpStore] = useState<XPStore>({ dates: {} })
   const [mounted, setMounted] = useState(false)
+  const [showNotifModal, setShowNotifModal] = useState(false)
+  const [notifSettings, setNotifSettings] = useState<NotifSettings>({ enabled: false, hour: 20, minute: 0 })
 
   useEffect(() => {
     const raw = localStorage.getItem(CHECKIN_KEY)
@@ -110,6 +121,38 @@ export default function HomeScreen() {
       setShowWeightModal(true)
     }
     setXpStore(loadXPStore())
+
+    // 通知設定を読み込む
+    const notifRaw = localStorage.getItem(NOTIF_KEY)
+    if (notifRaw) { try { setNotifSettings(JSON.parse(notifRaw)) } catch { /* ignore */ } }
+
+    // Service Worker 登録 + チェックイン状態の問い合わせ応答
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        const sendSchedule = (s: NotifSettings) => {
+          const target = reg.active ?? reg.installing ?? reg.waiting
+          target?.postMessage({ type: 'SCHEDULE', ...s })
+        }
+        const settings: NotifSettings = notifRaw
+          ? JSON.parse(notifRaw)
+          : { enabled: false, hour: 20, minute: 0 }
+        if (settings.enabled && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          sendSchedule(settings)
+        }
+      }).catch(() => { /* SW 未サポート環境は無視 */ })
+
+      // SW からのチェックイン状態問い合わせに応答
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'GET_CHECKIN_STATUS') {
+          const checkins: Record<string, string> = JSON.parse(
+            localStorage.getItem(CHECKIN_KEY) ?? '{}'
+          )
+          const todayKey = getDateKey(new Date())
+          event.ports[0]?.postMessage({ checkedIn: checkins[todayKey] === 'done' })
+        }
+      })
+    }
+
     setMounted(true)
   }, [])
 
@@ -165,6 +208,19 @@ export default function HomeScreen() {
     delete updated[todayKey]
     setCheckIns(updated)
     localStorage.setItem(CHECKIN_KEY, JSON.stringify(updated))
+  }
+
+  // 通知設定を保存して SW にスケジュールを送信
+  const handleNotifSave = async (enabled: boolean, hour: number, minute: number) => {
+    const settings: NotifSettings = { enabled, hour, minute }
+    setNotifSettings(settings)
+    localStorage.setItem(NOTIF_KEY, JSON.stringify(settings))
+    if ('serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.ready
+        reg.active?.postMessage({ type: 'SCHEDULE', ...settings })
+      } catch { /* ignore */ }
+    }
   }
 
   // 過去の日付のチェックイン切り替え：なし → done → rest → なし
@@ -224,6 +280,16 @@ export default function HomeScreen() {
         />
       )}
 
+      {showNotifModal && (
+        <NotificationModal
+          initialEnabled={notifSettings.enabled}
+          initialHour={notifSettings.hour}
+          initialMinute={notifSettings.minute}
+          onSave={handleNotifSave}
+          onClose={() => setShowNotifModal(false)}
+        />
+      )}
+
       <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center px-6 py-12 select-none">
         {/* Brand + 設定ボタン */}
         <div className="w-full max-w-sm flex items-start justify-between mb-10">
@@ -231,15 +297,24 @@ export default function HomeScreen() {
             <h1 className="text-4xl font-black tracking-[0.25em] text-white uppercase">M.WORLD</h1>
             <p className="text-zinc-600 text-xs tracking-[0.2em] mt-1 uppercase">Fitness Habit Tracker</p>
           </div>
-          <button
-            onClick={() => setShowWeightModal(true)}
-            className="flex flex-col items-center gap-1 mt-1 text-zinc-500 hover:text-orange-400 transition-colors"
-          >
-            <span className="text-lg leading-none">⚖️</span>
-            <span className="text-[10px] font-semibold whitespace-nowrap">
-              {bodyWeight != null ? `${bodyWeight}kg` : '体重'}
-            </span>
-          </button>
+          <div className="flex items-start gap-3 mt-1">
+            <button
+              onClick={() => setShowNotifModal(true)}
+              className="flex flex-col items-center gap-1 text-zinc-500 hover:text-orange-400 transition-colors"
+            >
+              <span className="text-lg leading-none">{notifSettings.enabled ? '🔔' : '🔕'}</span>
+              <span className="text-[10px] font-semibold whitespace-nowrap">通知</span>
+            </button>
+            <button
+              onClick={() => setShowWeightModal(true)}
+              className="flex flex-col items-center gap-1 text-zinc-500 hover:text-orange-400 transition-colors"
+            >
+              <span className="text-lg leading-none">⚖️</span>
+              <span className="text-[10px] font-semibold whitespace-nowrap">
+                {bodyWeight != null ? `${bodyWeight}kg` : '体重'}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Streak */}
