@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getWeekPlan, getAdviceForExercise, type Goal, type TrainingLocation, type Level, type DayPlan } from '../lib/menus'
 import { MENU_KEY } from '../lib/training'
+import MuscleHighlight from '../components/MuscleHighlight'
 
 interface FormState {
   goal: Goal
@@ -60,6 +61,9 @@ function WeekPlanView({ plan, level }: { plan: DayPlan[]; level: Level }) {
                     <span className="text-zinc-500 text-xs ml-auto">{ex.setsReps}</span>
                   </div>
                   <p className="text-zinc-500 text-xs italic pl-4 mb-2">{ex.advice}</p>
+                  <div className="pl-4 mb-2">
+                    <MuscleHighlight exerciseName={ex.name} />
+                  </div>
                   <a
                     href={youtubeUrl(ex.name, level)}
                     target="_blank"

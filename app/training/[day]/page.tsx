@@ -21,6 +21,7 @@ import {
 } from '../../lib/training'
 import { getAdviceForExercise } from '../../lib/menus'
 import { awardDayXP } from '../../lib/xp'
+import MuscleHighlight from '../../components/MuscleHighlight'
 
 interface EditableExercise {
   name: string
@@ -444,6 +445,11 @@ export default function TrainingDayPage({
                         </div>
 
                         <p className="text-zinc-600 text-xs italic mb-2">{ex.advice}</p>
+
+                        {/* 対象部位シルエット */}
+                        <div className="mb-3">
+                          <MuscleHighlight exerciseName={ex.name} />
+                        </div>
 
                         {/* 重量入力（ジム系） / 自重回数表示（自重系） */}
                         {!isBw ? (
