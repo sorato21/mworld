@@ -444,9 +444,9 @@ export default function TrainingDayPage({
                           </span>
                         </div>
 
-                        <p className="text-zinc-600 text-xs italic mb-2">{ex.advice}</p>
+                        <p className="text-zinc-600 text-xs italic mb-1.5">{ex.advice}</p>
 
-                        {/* 対象部位シルエット */}
+                        {/* 対象部位バッジ */}
                         <div className="mb-3">
                           <MuscleHighlight exerciseName={ex.name} />
                         </div>

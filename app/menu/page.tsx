@@ -60,7 +60,7 @@ function WeekPlanView({ plan, level }: { plan: DayPlan[]; level: Level }) {
                     <span className="text-white font-bold text-sm">{ex.name}</span>
                     <span className="text-zinc-500 text-xs ml-auto">{ex.setsReps}</span>
                   </div>
-                  <p className="text-zinc-500 text-xs italic pl-4 mb-2">{ex.advice}</p>
+                  <p className="text-zinc-500 text-xs italic pl-4 mb-1.5">{ex.advice}</p>
                   <div className="pl-4 mb-2">
                     <MuscleHighlight exerciseName={ex.name} />
                   </div>
