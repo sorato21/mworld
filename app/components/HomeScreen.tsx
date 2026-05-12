@@ -21,7 +21,15 @@ import WeightModal from './WeightModal'
 import NotificationModal from './NotificationModal'
 import GuideModal from './GuideModal'
 import DailyRecordModal from './DailyRecordModal'
+import BossCard from './BossCard'
 import { loadRecords, SKIP_RECORD_KEY } from '../lib/records'
+import {
+  type BossState,
+  loadBossState,
+  saveBossState,
+  getBossDefinition,
+  applyCheckinDamage,
+} from '../lib/boss'
 
 const NOTIF_KEY = 'mworld_notification_settings'
 
@@ -109,6 +117,8 @@ export default function HomeScreen() {
   const [notifSettings, setNotifSettings] = useState<NotifSettings>({ enabled: false, hour: 20, minute: 0 })
   const [showGuide, setShowGuide] = useState(false)
   const [showDailyRecord, setShowDailyRecord] = useState(false)
+  const [bossState, setBossState] = useState<BossState>({ bossIndex: 0, damageAccumulated: 0, lastDamageDateKey: null })
+  const [bossDefeatedMsg, setBossDefeatedMsg] = useState(false)
 
   useEffect(() => {
     const raw = localStorage.getItem(CHECKIN_KEY)
@@ -126,6 +136,7 @@ export default function HomeScreen() {
       setShowWeightModal(true)
     }
     setXpStore(loadXPStore())
+    setBossState(loadBossState())
 
     // 通知設定を読み込む
     const notifRaw = localStorage.getItem(NOTIF_KEY)
@@ -213,6 +224,20 @@ export default function HomeScreen() {
 
     if (status === 'done') {
       awardDayXP(todayKey)
+
+      const currentBoss = loadBossState()
+      const result = applyCheckinDamage(currentBoss, todayKey)
+      saveBossState(result.newState)
+      setBossState(result.newState)
+
+      if (result.defeated) {
+        const store = loadXPStore()
+        store.dates['boss_bonus'] = (store.dates['boss_bonus'] ?? 0) + result.xpBonus
+        saveXPStore(store)
+        setBossDefeatedMsg(true)
+        setTimeout(() => setBossDefeatedMsg(false), 4000)
+      }
+
       setXpStore(loadXPStore())
     }
   }
@@ -389,6 +414,17 @@ export default function HomeScreen() {
               今日 +{todayXP} XP 獲得！
             </p>
           )}
+        </div>
+
+        {/* Boss Battle */}
+        {bossDefeatedMsg && (
+          <div className="w-full max-w-sm mb-2 bg-orange-500 rounded-2xl px-5 py-3 text-center animate-pulse">
+            <p className="text-white font-black text-base">🎉 ボスを倒した！次のボスが現れた！</p>
+            <p className="text-orange-100 text-xs mt-0.5">+50 XP ボーナス獲得！</p>
+          </div>
+        )}
+        <div className="w-full max-w-sm mb-8">
+          <BossCard boss={getBossDefinition(bossState.bossIndex)} damageAccumulated={bossState.damageAccumulated} />
         </div>
 
         {/* Last 7 days */}
