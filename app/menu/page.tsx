@@ -153,8 +153,7 @@ export default function MenuPage() {
           if (ei !== exIdx) return ex
           const updated = { ...ex, [field]: value }
           if (field === 'name') {
-            const advice = getAdviceForExercise(value)
-            if (advice) updated.advice = advice
+            updated.advice = getAdviceForExercise(value)
           }
           return updated
         })

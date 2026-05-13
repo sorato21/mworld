@@ -556,8 +556,49 @@ const EXERCISE_ADVICE: Record<string, string> = Object.fromEntries(
     .map((ex) => [ex.name, ex.advice])
 )
 
+const ADVICE_RULES: Array<{ keywords: string[]; advice: string }> = [
+  {
+    keywords: ['ベンチプレス', 'インクラインベンチ'],
+    advice: '肩甲骨を寄せてアーチを作り、バーをゆっくり下ろす',
+  },
+  {
+    keywords: ['スクワット'],
+    advice: '膝をつま先と同じ方向に向け、背筋を伸ばして深くしゃがむ',
+  },
+  {
+    keywords: ['デッドリフト'],
+    advice: '背中をまっすぐ保ち、股関節から折り曲げるイメージで引く',
+  },
+  {
+    keywords: ['懸垂', 'ラットプルダウン'],
+    advice: '肩甲骨を下に引き寄せながら、背中で引く意識を持つ',
+  },
+  {
+    keywords: ['ショルダープレス'],
+    advice: '肘が耳の横にくる位置からプレスして肩全体を使う',
+  },
+  {
+    keywords: ['カール'],
+    advice: '肘を固定して、二頭筋の収縮を意識してゆっくり上げ下げする',
+  },
+  {
+    keywords: ['プランク'],
+    advice: '体を一直線に保ち、腹筋に力を入れて呼吸を続ける',
+  },
+  {
+    keywords: ['ランジ'],
+    advice: '膝がつま先より前に出ないように注意する',
+  },
+]
+
 export function getAdviceForExercise(name: string): string {
-  return EXERCISE_ADVICE[name] ?? ''
+  if (!name.trim()) return ''
+  const exact = EXERCISE_ADVICE[name]
+  if (exact) return exact
+  for (const rule of ADVICE_RULES) {
+    if (rule.keywords.some((kw) => name.includes(kw))) return rule.advice
+  }
+  return '正しいフォームで丁寧に行い、対象筋肉を意識する'
 }
 
 export function getWeekPlan(
